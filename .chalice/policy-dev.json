@@ -1,0 +1,17 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": [
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:GetItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ],
+        "Resource": ["arn:aws:dynamodb:*:*:table/my-demo-table"],
+        "Effect": "Allow"
+      }
+    ]
+  }
