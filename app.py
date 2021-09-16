@@ -4,22 +4,18 @@ from chalicelib.functions import db, text
 app = Chalice(app_name='hayden-api')
 app.debug = True
 
-@app.route("/test")
-def auth():
-    return db.scan("coconuts")
-
-@app.route("/s/{table}")
+@app.route("/s/{table}", methods=['GET'])
 def scan(table):
     return db.scan(table)
 
-@app.route("/p/{table}")
+@app.route("/p/{table}", methods=['GET'])
 def pscan(table):
     per_page = None
     if app.current_request.query_params is not None:
         per_page = app.current_request.query_params.get("per_page", None)
     return db.pscan(table, None, per_page)
 
-@app.route("/q/{table}")
+@app.route("/q/{table}", methods=["GET"])
 def qscan(table):
     return db.qscan(table, app.current_request.query_params)
     

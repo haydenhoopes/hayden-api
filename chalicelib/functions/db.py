@@ -1,6 +1,7 @@
 import boto3
 from boto3.dynamodb.conditions import Key
 from pprint import pprint
+import json
 
 dynamodb = boto3.resource("dynamodb")
 client = boto3.client("dynamodb")
@@ -18,7 +19,7 @@ def scan(table):
 
 def pscan(table, lastEvaluatedKey=None, per_page=None):
     if per_page:
-        pageLength = int(per_page);
+        pageLength = int(per_page)
     elif table in page_lengths.keys():
         pageLength = page_lengths[table]
     else:
@@ -36,30 +37,33 @@ def pscan(table, lastEvaluatedKey=None, per_page=None):
     data = {}
     for thing in page_iterator:
         data = thing
+
     return data
 
 def qscan(table, parameters):
-    kce = "category=:categoryAND_id=:_id"
+    if parameters == None:
+        return {"error": "No query specified."}
+          
+    per_page = parameters.get("per_page", None)
+    lastEvaluatedKey = parameters.get("lastEvaluatedKey", None)
 
-    eav = {
-        ':category': {
-            "S": 'Research'
-        },
-        ':_id': {
-            'NULL': False
-        }
-    }
-
+    ### This is the old AWS way to do things that I found out doesn't work very well.
     # kce = getKeyConditionExpression(parameters)
-    print(kce)
-    print("*"*40)
-    page_iterator = query_paginator.paginate(TableName=table, KeyConditionExpression=kce, ExpressionAttributeValues=eav)
+    # eav = getExpressionAttributeValues(parameters)
+    # print(kce)
+    # print(eav)
+    # page_iterator = query_paginator.paginate(TableName=table, IndexName="category-index", KeyConditionExpression=kce, ExpressionAttributeValues=eav)
 
-    data = {}
-    for p in page_iterator:
-        data = p
+    # data = {}
+    # for p in page_iterator:
+    #     data = p
+    # return data
+
+    data = dict(pscan(table, lastEvaluatedKey, per_page))
+    data['Items'] = filterQuery(data['Items'], parameters)
+    data['Count'] = len(data['Items'])
+    
     return data
-
 
 # Get single item from db
 def get(table, id):
@@ -119,11 +123,45 @@ def getKeyConditionExpression(data):
     kce = ""
     for key in data.keys():
         if count <= 0:
-            kce += f"{key} = :{data[key]}"
+            kce += f"{key} = :{key}"
         else:
-            kce += f"AND {key} = :{data[key]}"
+            kce += f" AND {key} = :{key}"
+        count += 1
     return kce
 
 def getExpressionAttributeValues(data):
+    eav = {}
+    for key in data.keys():
+        eav[f":{key}"] = {"S": data[key]}
+    return eav
+
+def filterQuery(items, parameters):
+    data = []
+
+    for i in items:
+        willReturn = True
+        allParamTechsInItem = True
+        for k in parameters.keys():
+            if k not in i.keys(): # Ignore bad query parameters that don't exist in item.
+                pass
+
+            elif "L" in i[k].keys(): # If the field is a list, like technologies
+                                     # This would occur if there are multiple of the query param
+
+                listOfTechsInItem = [str(tech['S']) for tech in i[k]['L']]
+                listOfTechsInParameters = parameters.getlist(k)
+
+                for t in listOfTechsInParameters:
+                    if str(t) not in listOfTechsInItem: # If all listed params not in item, do not return
+                        allParamTechsInItem = False
+                        break
+                break
+            
+            elif k in i.keys() and parameters[k] != i[k]['S']:
+                willReturn = False
+                break
+
+        if willReturn and allParamTechsInItem:
+            data.append(i)
+
     return data
-    
