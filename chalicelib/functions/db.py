@@ -1,7 +1,5 @@
 import boto3
 from boto3.dynamodb.conditions import Key
-from pprint import pprint
-import json
 
 dynamodb = boto3.resource("dynamodb")
 client = boto3.client("dynamodb")
@@ -38,7 +36,7 @@ def pscan(table, lastEvaluatedKey=None, per_page=None):
     for thing in page_iterator:
         data = thing
 
-    return data
+    return cleanData(data)
 
 def qscan(table, parameters):
     if parameters == None:
@@ -143,12 +141,12 @@ def filterQuery(items, parameters):
         allParamTechsInItem = True
         for k in parameters.keys():
             if k not in i.keys(): # Ignore bad query parameters that don't exist in item.
-                pass
+                willReturn = False
 
-            elif "L" in i[k].keys(): # If the field is a list, like technologies
+            elif isinstance(i[k], list): # If the field is a list, like technologies
                                      # This would occur if there are multiple of the query param
 
-                listOfTechsInItem = [str(tech['S']) for tech in i[k]['L']]
+                listOfTechsInItem = [str(thing) for thing in i[k]]
                 listOfTechsInParameters = parameters.getlist(k)
 
                 for t in listOfTechsInParameters:
@@ -157,11 +155,27 @@ def filterQuery(items, parameters):
                         break
                 break
             
-            elif k in i.keys() and parameters[k] != i[k]['S']:
+            elif k in i.keys() and parameters[k] != i[k]:
                 willReturn = False
                 break
 
         if willReturn and allParamTechsInItem:
             data.append(i)
 
+    return data
+
+def cleanData(data):
+    items = []
+    for d in data['Items']:
+        item = {}
+        for k in d.keys():
+            if 'S' in d[k].keys():
+                item[k] = d[k]['S']
+            if 'L' in d[k].keys():
+                li = []
+                for i in d[k]['L']:
+                    li.append(i['S'])
+                item[k] = li
+        items.append(item)                
+    data['Items'] = items
     return data
